@@ -1,0 +1,45 @@
+{
+  "name": "job-radar",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "today": "node scripts/today.ts",
+    "scan": "node scripts/scan.ts",
+    "ingest": "node scripts/ingest.ts",
+    "score": "node scripts/score.ts",
+    "summary": "node scripts/summary.ts",
+    "server": "node --watch server/index.ts",
+    "dev": "node server/index.ts & vite; kill %1",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@hono/node-server": "^2.1.1",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.4.0",
+    "hono": "^4.13.9",
+    "lucide-react": "^1.48.0",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.6.7",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "3.8.0",
+    "shadcn": "^4.21.0",
+    "sonner": "^2.0.8",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.6",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "profile": "",
+  "roles": [
+    {
+      "label": "Design systems / design engineer",
+      "match": [
+        "design system",
+        "design engineer"
+      ],
+      "points": 50
+    },
+    {
+      "label": "Product / UX / interaction designer",
+      "match": [
+        "product design",
+        "ux designer",
+        "ui/ux",
+        "ux/ui",
+        "user experience designer",
+        "interaction design"
+      ],
+      "points": 45
+    },
+    {
+      "label": "UX engineer",
+      "match": [
+        "ux engineer",
+        "design technologist"
+      ],
+      "points": 40
+    },
+    {
+      "label": "Forward deployed engineer",
+      "match": [
+        "forward deployed"
+      ],
+      "points": 40
+    }
+  ],
+  "otherRolePoints": 30,
+  "level": {
+    "senior": 20,
+    "mid": 12
+  },
+  "domains": {
+    "terms": [
+      "design systems",
+      "enterprise",
+      "saas",
+      "platform",
+      "ai",
+      "developer tools",
+      "prototyping"
+    ],
+    "pointsEach": 5,
+    "max": 15
+  },
+  "locationBonus": 10,
+  "claudeGuidance": "Title and level fit carries the most weight: a strong title match at the target level is about 80 or more.\nThen domain overlap with the profile.\nThen location: remote and the home area are equal.\nIf the posting has little detail, score from the title and company and say so in the note."
+}

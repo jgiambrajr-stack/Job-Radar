@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "job-radar", "runtimeExecutable": "node", "runtimeArgs": ["server/index.ts"], "port": 4321 }
+  ]
+}

@@ -1,0 +1,96 @@
+[
+  {
+    "name": "Vercel",
+    "adapter": "greenhouse",
+    "slug": "vercel",
+    "enabled": true
+  },
+  {
+    "name": "Anthropic",
+    "adapter": "greenhouse",
+    "slug": "anthropic",
+    "enabled": true
+  },
+  {
+    "name": "OpenAI",
+    "adapter": "ashby",
+    "slug": "openai",
+    "enabled": true
+  },
+  {
+    "name": "Supabase",
+    "adapter": "ashby",
+    "slug": "supabase",
+    "enabled": true
+  },
+  {
+    "name": "Adobe",
+    "adapter": "workday",
+    "url": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
+    "enabled": true
+  },
+  {
+    "name": "Zillow",
+    "adapter": "workday",
+    "url": "https://zillow.wd5.myworkdayjobs.com/Zillow_Group_External",
+    "enabled": true
+  },
+  {
+    "name": "Amazon",
+    "adapter": "amazon",
+    "enabled": true,
+    "note": "Includes Prime Video, AWS, Alexa"
+  },
+  {
+    "name": "Microsoft",
+    "adapter": "eightfold",
+    "url": "https://apply.careers.microsoft.com",
+    "slug": "microsoft.com",
+    "enabled": true,
+    "api": "pcsx"
+  },
+  {
+    "name": "Netflix",
+    "adapter": "eightfold",
+    "url": "https://explore.jobs.netflix.net",
+    "slug": "netflix.com",
+    "enabled": true,
+    "api": "v2"
+  },
+  {
+    "name": "GitHub",
+    "adapter": "jibe",
+    "url": "https://www.github.careers",
+    "enabled": true
+  },
+  {
+    "name": "DocuSign",
+    "adapter": "jibe",
+    "url": "https://careers.docusign.com",
+    "enabled": true
+  },
+  {
+    "name": "Google",
+    "adapter": "claude-browse",
+    "url": "https://www.google.com/about/careers/applications/jobs/results?q=%22product%20designer%22%20OR%20%22UX%20designer%22%20OR%20%22interaction%20designer%22&location=Seattle%2C%20WA%2C%20USA&location=United%20States&target_level=MID&target_level=ADVANCED",
+    "enabled": true
+  },
+  {
+    "name": "Meta",
+    "adapter": "claude-browse",
+    "url": "https://www.metacareers.com/jobs?q=product%20designer&offices[0]=Seattle%2C%20WA&offices[1]=Remote%2C%20US",
+    "enabled": true
+  },
+  {
+    "name": "EY",
+    "adapter": "claude-browse",
+    "url": "https://careers.ey.com/ey/search/?q=product+designer&locationsearch=United+States",
+    "enabled": true
+  },
+  {
+    "name": "Deloitte",
+    "adapter": "claude-browse",
+    "url": "https://apply.deloitte.com/en_US/careers/SearchJobs/product%20designer",
+    "enabled": true
+  }
+]
