@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
+      - name: Config is valid
+        run: node -e "import('./server/config.ts').then(m => { const e = m.validateScoring(m.loadScoring()) ?? m.validateLocations(m.loadLocations()); if (e) { console.error(e); process.exit(1) } })"

@@ -1,5 +1,7 @@
 # Job Radar
 
+[![CI](https://github.com/jgiambrajr-stack/Job-Radar/actions/workflows/ci.yml/badge.svg)](https://github.com/jgiambrajr-stack/Job-Radar/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933)
+
 A personal job search that runs itself. Every morning it checks the companies you care about, plus LinkedIn, for new roles that fit you. Each role gets a fit score against your background, and a local dashboard lets you triage them with the keyboard and track where every application stands.
 
 Everything runs on your own machine. There's no account, no cloud service, and no API keys. Claude does the browsing and scoring through your existing Claude Code or Claude desktop app.

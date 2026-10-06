@@ -44,11 +44,21 @@ app.patch('/api/contacts/:id', async (c) => {
   if (body.status !== undefined && !CONTACT_STATUSES.includes(body.status as never)) return c.json({ error: 'bad status' }, 400)
   const sets: string[] = []
   const vals: (string | null)[] = []
-  if (body.name?.trim()) sets.push('name = ?'), vals.push(body.name.trim())
-  if ('url' in body) sets.push('url = ?'), vals.push(body.url?.trim() || null)
+  if (body.name?.trim()) {
+    sets.push('name = ?')
+    vals.push(body.name.trim())
+  }
+  if ('url' in body) {
+    sets.push('url = ?')
+    vals.push(body.url?.trim() || null)
+  }
   if (body.status) {
-    sets.push('status = ?'), vals.push(body.status)
-    if (body.status !== 'found') sets.push('messaged_at = coalesce(messaged_at, ?)'), vals.push(now())
+    sets.push('status = ?')
+    vals.push(body.status)
+    if (body.status !== 'found') {
+      sets.push('messaged_at = coalesce(messaged_at, ?)')
+      vals.push(now())
+    }
   }
   if (sets.length) db.prepare(`UPDATE referral_contacts SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id)
   return c.json(db.prepare('SELECT * FROM referral_contacts WHERE id = ?').get(id))
@@ -106,10 +116,22 @@ app.patch('/api/jobs/:id', async (c) => {
     // A card entering a new column goes to the top until it's placed; the board sends the order right after.
     if (body.status !== current.status) sets.push(`status_changed_at = '${now()}'`, 'board_order = NULL')
   }
-  if ('notes' in body) sets.push('notes = ?'), vals.push((body.notes as string) ?? null)
-  if ('referral_contact' in body) sets.push('referral_contact = ?'), vals.push((body.referral_contact as string) ?? null)
-  if ('looking_for_referral' in body) sets.push('looking_for_referral = ?'), vals.push(body.looking_for_referral ? 1 : 0)
-  if ('read' in body) sets.push('read_at = ?'), vals.push(body.read ? now() : null)
+  if ('notes' in body) {
+    sets.push('notes = ?')
+    vals.push((body.notes as string) ?? null)
+  }
+  if ('referral_contact' in body) {
+    sets.push('referral_contact = ?')
+    vals.push((body.referral_contact as string) ?? null)
+  }
+  if ('looking_for_referral' in body) {
+    sets.push('looking_for_referral = ?')
+    vals.push(body.looking_for_referral ? 1 : 0)
+  }
+  if ('read' in body) {
+    sets.push('read_at = ?')
+    vals.push(body.read ? now() : null)
+  }
   if (!sets.length) return c.json({ ok: true })
   db.prepare(`UPDATE jobs SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...vals, now(), id)
   if (typeof body.status === 'string' && body.status !== current.status) logEvent(id, current.status, body.status)

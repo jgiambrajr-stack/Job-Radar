@@ -3,3 +3,7 @@ dist
 data/
 *.local
 .DS_Store
+.env*
+*.log
+.vscode/
+.idea/

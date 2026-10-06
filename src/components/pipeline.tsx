@@ -282,9 +282,21 @@ function CardBody({ job, className }: { job: Job; className?: string }) {
 }
 
 type SortKey = 'fit_score' | 'title' | 'company' | 'status' | 'status_changed_at' | 'first_seen'
+type Sort = { key: SortKey; dir: 1 | -1 }
+
+function Head({ k, sort, onSort, children, className }: { k: SortKey; sort: Sort; onSort: (k: SortKey) => void; children: React.ReactNode; className?: string }) {
+  return (
+    <TableHead className={className}>
+      <button className="hover:text-foreground inline-flex items-center gap-1" onClick={() => onSort(k)}>
+        {children}
+        <ArrowUpDown className={cn('size-3', sort.key === k ? 'opacity-100' : 'opacity-30')} />
+      </button>
+    </TableHead>
+  )
+}
 
 function PipelineTable({ jobs, onMove, onOpen }: Props) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'fit_score', dir: -1 })
+  const [sort, setSort] = useState<Sort>({ key: 'fit_score', dir: -1 })
   const rows = useMemo(() => {
     const order = (j: Job) => (sort.key === 'status' ? STATUSES.indexOf(j.status) : (j[sort.key] ?? ''))
     return jobs
@@ -296,26 +308,19 @@ function PipelineTable({ jobs, onMove, onOpen }: Props) {
       })
   }, [jobs, sort])
 
-  const Head = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
-    <TableHead className={className}>
-      <button className="hover:text-foreground inline-flex items-center gap-1" onClick={() => setSort((s) => ({ key: k, dir: s.key === k ? (-s.dir as 1 | -1) : -1 }))}>
-        {children}
-        <ArrowUpDown className={cn('size-3', sort.key === k ? 'opacity-100' : 'opacity-30')} />
-      </button>
-    </TableHead>
-  )
+  const head = { sort, onSort: (k: SortKey) => setSort((s) => ({ key: k, dir: s.key === k ? (-s.dir as 1 | -1) : -1 })) }
 
   return (
     <div className="rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow>
-            <Head k="fit_score" className="w-14">Fit</Head>
-            <Head k="title">Role</Head>
-            <Head k="company">Company</Head>
-            <Head k="status" className="w-40">Status</Head>
-            <Head k="status_changed_at">In stage</Head>
-            <Head k="first_seen">Found</Head>
+            <Head {...head} k="fit_score" className="w-14">Fit</Head>
+            <Head {...head} k="title">Role</Head>
+            <Head {...head} k="company">Company</Head>
+            <Head {...head} k="status" className="w-40">Status</Head>
+            <Head {...head} k="status_changed_at">In stage</Head>
+            <Head {...head} k="first_seen">Found</Head>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
