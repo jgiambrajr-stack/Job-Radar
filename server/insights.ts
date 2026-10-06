@@ -1,6 +1,6 @@
-import { loadCriteria } from './config.ts'
+import { areaFor, isRemote } from '../src/lib/location.ts'
+import { loadLocations } from './config.ts'
 import { db } from './db.ts'
-import { inHomeArea } from './filter.ts'
 
 type JobRow = {
   id: string
@@ -19,7 +19,7 @@ type JobRow = {
 type EventRow = { job_id: string; from_status: string | null; to_status: string; at: string }
 
 const DAY = 86400000
-const INTERESTED = new Set(['interested', 'referral', 'applied', 'interviewing'])
+const INTERESTED = new Set(['interested', 'referral', 'applying', 'applied', 'interviewing'])
 const APPLIED = new Set(['applied', 'interviewing'])
 // Words that say nothing about the kind of work: seniority, the job family itself, filler.
 const STOP = new Set(
@@ -165,8 +165,8 @@ export function insights() {
   const leanToward = kept.map(toTerm).filter((t) => t.positiveRate >= 50).sort((a, b) => b.positiveRate - a.positiveRate || b.count - a.count).slice(0, 10)
   const passOn = kept.map(toTerm).filter((t) => t.dismissRate >= 60).sort((a, b) => b.dismissRate - a.dismissRate || b.count - a.count).slice(0, 10)
 
-  const crit = loadCriteria()
-  const locKind = (j: JobRow) => (inHomeArea(j.location, crit) ? crit.homeArea.label : j.remote || /remote/i.test(j.location ?? '') ? 'Remote' : 'Other')
+  const locRules = loadLocations()
+  const locKind = (j: JobRow) => areaFor(j.location, locRules)?.name ?? (isRemote(j.location, j.remote) ? 'Remote' : 'Other')
   const locations = [...group(locKind)].map(([location, js]) => ({
     location,
     found: js.length,

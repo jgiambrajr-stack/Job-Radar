@@ -6,6 +6,9 @@
     "ux/ui",
     "ui/ux",
     "user experience designer",
+    "senior designer",
+    "designer ii",
+    "designer 2",
     "interaction designer",
     "interaction design",
     "design systems",
@@ -13,6 +16,7 @@
     "design engineer",
     "ux engineer",
     "design technologist",
+    "creative technologist",
     "forward deployed engineer"
   ],
   "titleExclude": [
@@ -67,7 +71,8 @@
     "pcb",
     "civil",
     "hvac",
-    "packaging"
+    "packaging",
+    "subsystem"
   ],
   "tags": {
     "forward deployed engineer": "FDE",
@@ -75,62 +80,70 @@
     "ux engineer": "Design Eng",
     "design system": "Design Systems"
   },
-  "locationInclude": [
-    "remote"
-  ],
-  "remoteMustBeUS": true,
-  "nonUSMarkers": [
-    "canada",
-    "uk",
-    "united kingdom",
-    "london",
-    "india",
-    "ireland",
-    "germany",
-    "emea",
-    "apac",
-    "europe",
-    "mexico",
-    "brazil",
-    "japan",
-    "singapore",
-    "australia",
-    "poland",
-    "spain",
-    "france",
-    "netherlands",
-    "israel",
-    "toronto",
-    "vancouver",
-    "uae",
-    "abu dhabi",
-    "dubai",
-    "korea",
-    "seoul",
-    "china",
-    "taiwan",
-    "hong kong",
-    "sweden",
-    "switzerland",
-    "italy",
-    "portugal",
-    "romania",
-    "argentina",
-    "colombia",
-    "philippines",
-    "vietnam",
-    "new zealand",
-    "south africa",
-    "latam"
-  ],
-  "homeArea": {
-    "label": "Seattle area",
-    "terms": [
-      "seattle",
-      "bellevue",
-      "redmond",
-      "kirkland",
-      "wa"
+  "locations": {
+    "areas": [
+      {
+        "name": "Seattle area",
+        "match": [
+          "seattle",
+          "bellevue",
+          "redmond",
+          "kirkland",
+          "wa",
+          "washington"
+        ],
+        "exclude": [
+          "washington, dc",
+          "washington dc",
+          "district of columbia"
+        ]
+      }
+    ],
+    "includeRemote": true,
+    "remoteUSOnly": true,
+    "nonUSMarkers": [
+      "canada",
+      "uk",
+      "united kingdom",
+      "london",
+      "india",
+      "ireland",
+      "germany",
+      "emea",
+      "apac",
+      "europe",
+      "mexico",
+      "brazil",
+      "japan",
+      "singapore",
+      "australia",
+      "poland",
+      "spain",
+      "france",
+      "netherlands",
+      "israel",
+      "toronto",
+      "vancouver",
+      "uae",
+      "abu dhabi",
+      "dubai",
+      "korea",
+      "seoul",
+      "china",
+      "taiwan",
+      "hong kong",
+      "sweden",
+      "switzerland",
+      "italy",
+      "portugal",
+      "romania",
+      "argentina",
+      "colombia",
+      "philippines",
+      "vietnam",
+      "new zealand",
+      "south africa",
+      "latam"
     ]
   }
 }

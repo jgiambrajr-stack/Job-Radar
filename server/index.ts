@@ -4,8 +4,9 @@ import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { ADAPTERS } from './adapters.ts'
-import { loadCompanies, loadCriteria, loadScoring, saveCompanies, saveScoring, validateScoring } from './config.ts'
-import { ROOT, STATUSES, db, logEvent, now, rescoreRules } from './db.ts'
+import { loadCompanies, loadLocations, loadScoring, saveCompanies, saveLocations, saveScoring, validateLocations, validateScoring } from './config.ts'
+import { checkLocation } from '../src/lib/location.ts'
+import { CONTACT_STATUSES, ROOT, STATUSES, db, logEvent, now, rescoreRules } from './db.ts'
 import { scoreBreakdown } from './score.ts'
 import { insights } from './insights.ts'
 import { detectAts } from './detect.ts'
@@ -17,7 +18,78 @@ const app = new Hono()
 
 app.get('/api/jobs', (c) => {
   const rows = db.prepare('SELECT * FROM jobs ORDER BY first_seen DESC').all() as any[]
-  return c.json(rows.map((r) => ({ ...r, remote: !!r.remote, looking_for_referral: !!r.looking_for_referral, tags: r.tags ? r.tags.split(',') : [] })))
+  const contacts = new Map<string, unknown[]>()
+  for (const ct of db.prepare('SELECT * FROM referral_contacts ORDER BY created_at, id').all() as { job_id: string }[]) {
+    contacts.set(ct.job_id, [...(contacts.get(ct.job_id) ?? []), ct])
+  }
+  return c.json(rows.map((r) => ({ ...r, remote: !!r.remote, looking_for_referral: !!r.looking_for_referral, tags: r.tags ? r.tags.split(',') : [], contacts: contacts.get(r.id) ?? [] })))
+})
+
+// Referral contacts: people found at the company, each with their own progress.
+app.post('/api/jobs/:id/contacts', async (c) => {
+  const id = c.req.param('id')
+  const { name, url } = await c.req.json<{ name?: string; url?: string }>()
+  if (!name?.trim()) return c.json({ error: 'name required' }, 400)
+  if (!db.prepare('SELECT 1 FROM jobs WHERE id = ?').get(id)) return c.json({ error: 'not found' }, 404)
+  const { lastInsertRowid } = db.prepare('INSERT INTO referral_contacts (job_id, name, url, created_at) VALUES (?,?,?,?)').run(id, name.trim(), url?.trim() || null, now())
+  // Adding a person implies you're looking for a referral.
+  db.prepare('UPDATE jobs SET looking_for_referral = 1 WHERE id = ?').run(id)
+  return c.json(db.prepare('SELECT * FROM referral_contacts WHERE id = ?').get(lastInsertRowid))
+})
+
+app.patch('/api/contacts/:id', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json<{ name?: string; url?: string | null; status?: string }>()
+  if (!db.prepare('SELECT 1 FROM referral_contacts WHERE id = ?').get(id)) return c.json({ error: 'not found' }, 404)
+  if (body.status !== undefined && !CONTACT_STATUSES.includes(body.status as never)) return c.json({ error: 'bad status' }, 400)
+  const sets: string[] = []
+  const vals: (string | null)[] = []
+  if (body.name?.trim()) sets.push('name = ?'), vals.push(body.name.trim())
+  if ('url' in body) sets.push('url = ?'), vals.push(body.url?.trim() || null)
+  if (body.status) {
+    sets.push('status = ?'), vals.push(body.status)
+    if (body.status !== 'found') sets.push('messaged_at = coalesce(messaged_at, ?)'), vals.push(now())
+  }
+  if (sets.length) db.prepare(`UPDATE referral_contacts SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id)
+  return c.json(db.prepare('SELECT * FROM referral_contacts WHERE id = ?').get(id))
+})
+
+app.delete('/api/contacts/:id', (c) => {
+  db.prepare('DELETE FROM referral_contacts WHERE id = ?').run(Number(c.req.param('id')))
+  return c.json({ ok: true })
+})
+
+// Manual order of cards in a board column; index in the list becomes board_order.
+app.put('/api/jobs/order', async (c) => {
+  const { ids } = await c.req.json<{ ids: string[] }>()
+  if (!Array.isArray(ids)) return c.json({ error: 'ids required' }, 400)
+  const stmt = db.prepare('UPDATE jobs SET board_order = ? WHERE id = ?')
+  db.exec('BEGIN')
+  try {
+    ids.forEach((id, i) => stmt.run(i, id))
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+  return c.json({ ok: true })
+})
+
+// Mark a batch of Inbox jobs read at once.
+app.post('/api/jobs/read', async (c) => {
+  const { ids } = await c.req.json<{ ids: string[] }>()
+  if (!Array.isArray(ids)) return c.json({ error: 'ids required' }, 400)
+  const stmt = db.prepare('UPDATE jobs SET read_at = ? WHERE id = ? AND read_at IS NULL')
+  const ts = now()
+  db.exec('BEGIN')
+  try {
+    for (const id of ids) stmt.run(ts, id)
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+  return c.json({ ok: true })
 })
 
 app.patch('/api/jobs/:id', async (c) => {
@@ -31,11 +103,13 @@ app.patch('/api/jobs/:id', async (c) => {
     if (!STATUSES.includes(body.status as never)) return c.json({ error: 'bad status' }, 400)
     sets.push('status = ?')
     vals.push(body.status)
-    if (body.status !== current.status) sets.push(`status_changed_at = '${now()}'`)
+    // A card entering a new column goes to the top until it's placed; the board sends the order right after.
+    if (body.status !== current.status) sets.push(`status_changed_at = '${now()}'`, 'board_order = NULL')
   }
   if ('notes' in body) sets.push('notes = ?'), vals.push((body.notes as string) ?? null)
   if ('referral_contact' in body) sets.push('referral_contact = ?'), vals.push((body.referral_contact as string) ?? null)
   if ('looking_for_referral' in body) sets.push('looking_for_referral = ?'), vals.push(body.looking_for_referral ? 1 : 0)
+  if ('read' in body) sets.push('read_at = ?'), vals.push(body.read ? now() : null)
   if (!sets.length) return c.json({ ok: true })
   db.prepare(`UPDATE jobs SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...vals, now(), id)
   if (typeof body.status === 'string' && body.status !== current.status) logEvent(id, current.status, body.status)
@@ -50,7 +124,7 @@ app.get('/api/meta', (c) => {
     .prepare(`SELECT company, error FROM runs WHERE id IN (SELECT max(id) FROM runs WHERE company IS NOT NULL GROUP BY company)
       AND error IS NOT NULL AND error NOT LIKE 'Rate limited%'`)
     .all()
-  return c.json({ lastRun: lastRun.t, errors, homeArea: loadCriteria().homeArea })
+  return c.json({ lastRun: lastRun.t, errors, locations: loadLocations() })
 })
 
 app.get('/api/companies', (c) => {
@@ -111,6 +185,20 @@ app.get('/api/jobs/:id/score', (c) => {
   const j = db.prepare('SELECT title, location, remote, description_snippet, fit_score, score_source, fit_notes FROM jobs WHERE id = ?').get(c.req.param('id')) as any
   if (!j) return c.json({ error: 'not found' }, 404)
   return c.json({ source: j.score_source ?? 'rules', score: j.fit_score, notes: j.fit_notes, rules: scoreBreakdown(j) })
+})
+
+app.get('/api/locations', (c) => c.json(loadLocations()))
+app.put('/api/locations', async (c) => {
+  const body = await c.req.json()
+  const err = validateLocations(body)
+  if (err) return c.json({ error: err }, 400)
+  saveLocations(body)
+  return c.json({ ok: true })
+})
+app.post('/api/locations/preview', async (c) => {
+  const { location, config } = await c.req.json()
+  if (validateLocations(config)) return c.json(null)
+  return c.json(checkLocation(String(location ?? ''), false, config))
 })
 
 app.get('/api/scoring', (c) => c.json(loadScoring()))

@@ -59,9 +59,7 @@ export function Insights({ data, onTerm, onOpen }: Props) {
             {data.followUps.map((f) => (
               <div key={f.id} onClick={() => onOpen(f.id)} className="hover:bg-muted/40 -mx-2 flex cursor-pointer items-center gap-3 rounded-md px-2 py-2">
                 <div className="min-w-0 flex-1">
-                  <a href={f.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="font-medium hover:underline">
-                    {f.title}
-                  </a>
+                  <span className="font-medium">{f.title}</span>
                   <p className="text-muted-foreground text-xs">
                     {f.company} · {STATUS_LABEL[f.status]} for {f.days} days
                   </p>
@@ -181,7 +179,7 @@ export function Insights({ data, onTerm, onOpen }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>By location</CardTitle>
-            <CardDescription>Your home area vs remote, for roles you kept and dismissed.</CardDescription>
+            <CardDescription>Your areas vs remote, for roles you kept and dismissed.</CardDescription>
           </CardHeader>
           <CardContent>
             <SortTable

@@ -62,6 +62,34 @@ if (!cols.includes('score_source')) {
   db.exec("ALTER TABLE jobs ADD COLUMN score_source TEXT")
   db.exec("UPDATE jobs SET score_source = 'claude' WHERE fit_score IS NOT NULL")
 }
+// Manual card order on the pipeline board. Seeded once by fit score so the board looks the same.
+if (!cols.includes('board_order')) {
+  db.exec('ALTER TABLE jobs ADD COLUMN board_order REAL')
+  db.exec(`UPDATE jobs SET board_order = (SELECT count(*) FROM jobs j2 WHERE j2.status = jobs.status
+    AND (ifnull(j2.fit_score, -1) > ifnull(jobs.fit_score, -1) OR (ifnull(j2.fit_score, -1) = ifnull(jobs.fit_score, -1) AND j2.id < jobs.id)))
+    WHERE status NOT IN ('new', 'dismissed')`)
+}
+// Inbox read state: NULL until the job is opened. Anything already triaged counts as read.
+if (!cols.includes('read_at')) {
+  db.exec('ALTER TABLE jobs ADD COLUMN read_at TEXT')
+  db.exec("UPDATE jobs SET read_at = status_changed_at WHERE status != 'new'")
+}
+// People found for a referral, each with their own progress. Replaces the old free-text referral_contact.
+const hasContacts = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'referral_contacts'").get()
+if (!hasContacts) {
+  db.exec(`CREATE TABLE referral_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      url TEXT,
+      status TEXT NOT NULL DEFAULT 'found',
+      messaged_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX referral_contacts_job ON referral_contacts(job_id);
+    INSERT INTO referral_contacts (job_id, name, status, messaged_at, created_at)
+      SELECT id, trim(referral_contact), 'messaged', updated_at, updated_at FROM jobs WHERE trim(ifnull(referral_contact, '')) != '';`)
+}
 // Anything still unscored gets the instant rules score.
 rescoreRules('unscored')
 
@@ -70,8 +98,9 @@ db.exec(`INSERT INTO events (job_id, from_status, to_status, at)
   SELECT id, 'new', status, status_changed_at FROM jobs
   WHERE status != 'new' AND id NOT IN (SELECT job_id FROM events)`)
 
-export const STATUSES = ['new', 'interested', 'applied', 'interviewing', 'declined', 'dismissed'] as const
+export const STATUSES = ['new', 'interested', 'applying', 'applied', 'interviewing', 'declined', 'dismissed'] as const
 export type Status = (typeof STATUSES)[number]
+export const CONTACT_STATUSES = ['found', 'messaged', 'replied', 'referred', 'no_response'] as const
 
 export type IncomingJob = {
   company: string

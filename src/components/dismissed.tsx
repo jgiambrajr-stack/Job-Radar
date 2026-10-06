@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { JobTitleLink, OpenPostingButton, locationLabel } from '@/components/job-bits'
+import { JobTitle, OpenPostingButton, locationLabel } from '@/components/job-bits'
 import { type Job, timeAgo } from '@/lib/api'
 
 export function Dismissed({ jobs, onRestore, onOpen }: { jobs: Job[]; onRestore: (job: Job) => void; onOpen: (job: Job) => void }) {
@@ -21,7 +21,7 @@ export function Dismissed({ jobs, onRestore, onOpen }: { jobs: Job[]; onRestore:
         {rows.map((job) => (
           <div key={job.id} onClick={() => onOpen(job)} className="hover:bg-muted/40 flex cursor-pointer items-center gap-3 px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <JobTitleLink job={job} className="text-muted-foreground" />
+              <JobTitle job={job} className="text-muted-foreground" />
               <p className="text-muted-foreground truncate text-xs">
                 {job.company} · {locationLabel(job)} · dismissed {timeAgo(job.status_changed_at)}
               </p>

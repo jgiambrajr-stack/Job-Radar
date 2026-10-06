@@ -17,7 +17,10 @@
         "ui/ux",
         "ux/ui",
         "user experience designer",
-        "interaction design"
+        "interaction design",
+        "senior designer",
+        "designer ii",
+        "designer 2"
       ],
       "points": 45
     },
@@ -25,7 +28,8 @@
       "label": "UX engineer",
       "match": [
         "ux engineer",
-        "design technologist"
+        "design technologist",
+        "creative technologist"
       ],
       "points": 40
     },

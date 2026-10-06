@@ -5,24 +5,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { Job } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-/** Real link so cmd-click / middle-click work. Stops propagation so it never selects or opens the sheet. */
-export function JobTitleLink({ job, className }: { job: Job; className?: string }) {
-  return (
-    <a
-      href={job.url}
-      target="_blank"
-      rel="noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className={cn('font-medium hover:underline underline-offset-4', className)}
-    >
-      {job.title}
-    </a>
-  )
+/** Plain text: a click falls through to the row or card, which opens the job sheet. The arrow button opens the posting. */
+export function JobTitle({ job, className }: { job: Job; className?: string }) {
+  return <span className={cn('font-medium', className)}>{job.title}</span>
 }
 
-export function OpenPostingButton({ job, label = false }: { job: Job; label?: boolean }) {
+export function OpenPostingButton({ job, label = false, onOpened }: { job: Job; label?: boolean; onOpened?: () => void }) {
   const button = (
-    <Button variant="ghost" size={label ? 'sm' : 'icon-sm'} asChild onClick={(e) => e.stopPropagation()}>
+    <Button
+      variant="ghost"
+      size={label ? 'sm' : 'icon-sm'}
+      asChild
+      onClick={(e) => {
+        e.stopPropagation()
+        onOpened?.()
+      }}
+    >
       <a href={job.url} target="_blank" rel="noreferrer" aria-label="Open posting in a new tab">
         <ExternalLink />
         {label && 'Open posting'}
@@ -59,7 +57,7 @@ export function FitScore({ score, source }: { score: number | null; source?: str
 export function JobTags({ job }: { job: Job }) {
   return (
     <>
-      {job.looking_for_referral && <Badge variant="default">Looking for referral</Badge>}
+      {job.looking_for_referral && <Badge variant="default">{referralSummary(job)}</Badge>}
       {job.tags.map((t) => (
         <Badge key={t} variant="secondary">
           {t}
@@ -67,6 +65,16 @@ export function JobTags({ job }: { job: Job }) {
       ))}
     </>
   )
+}
+
+/** "Looking for referral" until you add people, then where things stand with them. */
+function referralSummary(job: Job) {
+  const cs = job.contacts
+  if (!cs.length) return 'Looking for referral'
+  if (cs.some((c) => c.status === 'referred')) return 'Referred'
+  const messaged = cs.filter((c) => c.status !== 'found').length
+  const replied = cs.filter((c) => c.status === 'replied').length
+  return [`Referral · ${cs.length} ${cs.length === 1 ? 'person' : 'people'}`, messaged && `${messaged} messaged`, replied && `${replied} replied`].filter(Boolean).join(', ')
 }
 
 export function locationLabel(job: Job) {

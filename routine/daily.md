@@ -10,11 +10,11 @@ You are running the user's daily job scan. Work in the Job Radar repo root (the 
 ## Criteria (full list in `config/criteria.json`)
 - Roles: a title must contain a `titleInclude` term and no `titleExclude` term (whole word).
 - Level: the level the user targets, per `titleExclude` and the `profile` in `config/scoring.json`.
-- Location: `homeArea` (any of its `terms`) or remote. If `remoteMustBeUS` is true, remote roles must be open in the US.
+- Location: the `locations` block in `config/criteria.json`, which the user edits in Settings → Locations. A role must be in one of the `areas`, or be remote when `includeRemote` is on (US-open only if `remoteUSOnly`). `pnpm ingest` applies the same rules, so when in doubt, include the role and let ingest decide.
 - When a title matches on words but is clearly a different field (e.g. a mechanical "design engineer" for a UX search), skip it.
 
 ## Steps
-1. **Feeds.** Run `pnpm scan` and note any failures from the table. Microsoft and Netflix sometimes rate-limit (403/429). For any company whose feed failed, browse its careers site in step 2 instead (Microsoft: https://apply.careers.microsoft.com/careers?query=<title>, Netflix: https://explore.jobs.netflix.net/careers?query=<title>, using the first `titleInclude` term, URL-encoded).
+1. **Feeds.** Run `pnpm scan` and note any failures from the table. Some feeds rate-limit (403/429), Microsoft and Netflix especially. For any company whose feed failed, browse its careers site in step 2 instead (for example Microsoft: https://apply.careers.microsoft.com/careers?query=<title>, Netflix: https://explore.jobs.netflix.net/careers?query=<title>, with one search per main `titleInclude` term, URL-encoded).
 2. **Companies Claude browses.** For every entry in `config/companies.json` with `"adapter": "claude-browse"` and `"enabled": true`, open its `url` (use WebFetch first, and Claude in Chrome if the page needs JavaScript). Collect every posting that matches the criteria, using the posting's direct URL. Look past page one if the results are paginated.
 3. **LinkedIn catch-all.** Using Claude in Chrome (the user's logged-in browser), open each search in `config/linkedin.json` and read the result list with `get_page_text` (scroll once or twice for more). Collect matching roles. Skip companies whose adapter in `companies.json` is a feed (greenhouse, ashby, lever, workday, amazon, eightfold, jibe), since those are already covered. Use `https://www.linkedin.com/jobs/view/<id>/` as the URL. If Chrome isn't connected or LinkedIn blocks you, skip this step and say so in the summary.
 4. **Ingest.** Write what you collected to `data/inbox/<YYYY-MM-DD>-browse.json` and `data/inbox/<YYYY-MM-DD>-linkedin.json` in this shape:

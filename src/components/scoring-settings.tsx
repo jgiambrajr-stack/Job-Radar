@@ -113,7 +113,7 @@ export function ScoringSettings({ onRescored }: { onRescored: () => void }) {
           <Row label="Mid level">
             <Points value={draft.level.mid} onChange={(v) => edit((d) => void (d.level.mid = v))} />
           </Row>
-          <Row label="Remote or home area">
+          <Row label="Location match">
             <Points value={draft.locationBonus} onChange={(v) => edit((d) => void (d.locationBonus = v))} />
           </Row>
         </div>
@@ -160,7 +160,7 @@ export function ScoringSettings({ onRescored }: { onRescored: () => void }) {
   )
 }
 
-function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+export function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
       <div>
@@ -194,7 +194,7 @@ function Points({ value, onChange }: { value: number; onChange: (v: number) => v
   )
 }
 
-function Chips({ values, onChange, placeholder }: { values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+export function Chips({ values, onChange, placeholder }: { values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
   const [text, setText] = useState('')
   const add = () => {
     const v = text.trim().toLowerCase()
@@ -249,7 +249,7 @@ function TryTitle({ config }: { config: Scoring }) {
         <FitScore score={result?.score ?? null} source="claude" />
       </div>
       {result && result.parts.length > 0 && <Breakdown parts={result.parts} />}
-      <p className="text-muted-foreground text-[11px]">Remote and home-area bonuses come from each job's location, so they aren't counted here.</p>
+      <p className="text-muted-foreground text-[11px]">Location bonuses come from each job's location, so they aren't counted here.</p>
     </div>
   )
 }

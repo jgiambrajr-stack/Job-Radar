@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { CompanyFilter } from '@/components/company-filter'
 import { Dismissed } from '@/components/dismissed'
 import { Inbox, type TriageAction } from '@/components/inbox'
 import { Insights, useInsights } from '@/components/insights'
@@ -13,19 +14,37 @@ import { Pipeline } from '@/components/pipeline'
 import { SettingsSheet } from '@/components/settings'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useJobs } from '@/hooks/use-jobs'
+import { areaFor, isRemote } from '@/lib/location'
 import { api, PIPELINE, STATUS_LABEL, type Job, type JobPatch, type Status, type SweepState, timeAgo } from '@/lib/api'
 
-type Filters = { q: string; company: string; where: 'all' | 'remote' | 'home'; minFit: string }
-// Same rule as inHomeArea in server/filter.ts: any configured term, as a whole word.
-const inHome = (location: string | null, terms: string[] = []) =>
-  terms.some((t) => new RegExp(`(^|[^a-z])${t.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}($|[^a-z])`, 'i').test(location ?? ''))
+// where: 'all', 'remote', or the name of one of your configured areas.
+type Filters = { q: string; where: string; minFit: string }
+
+const HIDDEN_KEY = 'companyFilterHidden'
+function loadHidden(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '[]')
+    return Array.isArray(v) ? v : []
+  } catch {
+    return []
+  }
+}
 
 export default function App() {
-  const { jobs, meta, loading, reload, update } = useJobs()
+  const { jobs, meta, loading, reload, update, markAllRead, reorder, addContact, updateContact, removeContact } = useJobs()
   const [tab, setTab] = useState('inbox')
   const [openId, setOpenId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [filters, setFilters] = useState<Filters>({ q: '', company: 'all', where: 'all', minFit: '0' })
+  const [filters, setFilters] = useState<Filters>({ q: '', where: 'all', minFit: '0' })
+  const [hiddenCompanies, setHiddenCompanies] = useState<string[]>(loadHidden)
+  const changeHidden = (hidden: string[]) => {
+    setHiddenCompanies(hidden)
+    try {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(hidden))
+    } catch {
+      // storage unavailable: the pick just won't persist
+    }
+  }
   const [drawer, setDrawer] = useState<null | 'insights' | 'settings'>(null)
   const [sweep, setSweep] = useState<SweepState>({ state: 'idle' })
   const insights = useInsights(jobs)
@@ -61,12 +80,12 @@ export default function App() {
     return jobs.filter(
       (j) =>
         (!q || `${j.title} ${j.company} ${j.location} ${j.notes ?? ''}`.toLowerCase().includes(q)) &&
-        (filters.company === 'all' || j.company === filters.company) &&
+        !hiddenCompanies.includes(j.company) &&
         (filters.where === 'all' ||
-          (filters.where === 'remote' ? j.remote || /remote/i.test(j.location ?? '') : inHome(j.location, meta?.homeArea.terms))) &&
+          (filters.where === 'remote' ? isRemote(j.location, j.remote) : !!meta && areaFor(j.location, meta.locations)?.name === filters.where)) &&
         (j.fit_score ?? 0) >= Number(filters.minFit),
     )
-  }, [jobs, filters, meta])
+  }, [jobs, filters, hiddenCompanies, meta])
 
   const inbox = useMemo(
     () => filtered.filter((j) => j.status === 'new').sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1) || b.first_seen.localeCompare(a.first_seen)),
@@ -74,14 +93,18 @@ export default function App() {
   )
   const pipeline = useMemo(() => filtered.filter((j) => PIPELINE.includes(j.status)), [filtered])
   const dismissed = useMemo(() => jobs.filter((j) => j.status === 'dismissed'), [jobs])
-  const companies = useMemo(() => [...new Set(jobs.map((j) => j.company))].sort(), [jobs])
+  const companies = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const j of jobs) if (j.status !== 'dismissed') counts.set(j.company, (counts.get(j.company) ?? 0) + 1)
+    return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [jobs])
 
   const change = useCallback(
     async (job: Job, patch: JobPatch, message: string) => {
       const before = await update(job.id, patch)
       if (!before) return
       const undo: JobPatch = {}
-      for (const k of Object.keys(patch) as (keyof JobPatch)[]) (undo as Record<string, unknown>)[k] = before[k]
+      for (const k of Object.keys(patch) as (keyof JobPatch)[]) (undo as Record<string, unknown>)[k] = (before as Record<string, unknown>)[k]
       toast(message, { description: `${job.title} at ${job.company}`, action: { label: 'Undo', onClick: () => update(job.id, undo) } })
     },
     [update],
@@ -97,7 +120,22 @@ export default function App() {
     [change],
   )
   const onMove = useCallback((job: Job, status: Status) => change(job, { status }, `Moved to ${STATUS_LABEL[status]}`), [change])
-  const onOpen = useCallback((job: Job) => setOpenId(job.id), [])
+  const onOpen = useCallback(
+    (job: Job) => {
+      setOpenId(job.id)
+      if (!job.read_at) update(job.id, { read: true })
+    },
+    [update],
+  )
+  const onRead = useCallback((job: Job, read: boolean) => update(job.id, { read }), [update])
+  const onMarkAllRead = useCallback(
+    (list: Job[]) => {
+      markAllRead(list.map((j) => j.id))
+      toast(`Marked ${list.length} read`)
+    },
+    [markAllRead],
+  )
+  const unreadCount = inbox.filter((j) => !j.read_at).length
 
   // One button: company feeds first (seconds), then the LinkedIn sweep in the background (minutes).
   const refresh = async () => {
@@ -154,7 +192,7 @@ export default function App() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <TabsList>
-              <TabsTrigger value="inbox">Inbox <Count n={inbox.length} /></TabsTrigger>
+              <TabsTrigger value="inbox">Inbox <Count n={inbox.length} unread={unreadCount} /></TabsTrigger>
               <TabsTrigger value="pipeline">Pipeline <Count n={pipeline.length} /></TabsTrigger>
               <TabsTrigger value="dismissed">Dismissed <Count n={dismissed.length} /></TabsTrigger>
             </TabsList>
@@ -167,19 +205,15 @@ export default function App() {
           </div>
           {showFilters && (
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={filters.company} onValueChange={(v) => set('company', v)}>
-                <SelectTrigger size="sm" className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All companies</SelectItem>
-                  {companies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filters.where} onValueChange={(v) => set('where', v as Filters['where'])}>
+              <CompanyFilter companies={companies} hidden={hiddenCompanies} onChange={changeHidden} />
+              <Select value={filters.where} onValueChange={(v) => set('where', v)}>
                 <SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Anywhere</SelectItem>
                   <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="home">{meta?.homeArea.label ?? "Home area"}</SelectItem>
+                  {meta?.locations.areas.map((a) => (
+                    <SelectItem key={a.name} value={a.name}>{a.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={filters.minFit} onValueChange={(v) => set('minFit', v)}>
@@ -198,8 +232,8 @@ export default function App() {
           <p className="text-muted-foreground py-20 text-center text-sm">Loading</p>
         ) : (
           <>
-            <TabsContent value="inbox"><Inbox jobs={inbox} onAction={onTriage} onOpen={onOpen} similarTerms={similarTerms} /></TabsContent>
-            <TabsContent value="pipeline"><Pipeline jobs={pipeline} onMove={onMove} onOpen={onOpen} /></TabsContent>
+            <TabsContent value="inbox"><Inbox jobs={inbox} onAction={onTriage} onOpen={onOpen} onRead={onRead} onMarkAllRead={onMarkAllRead} similarTerms={similarTerms} /></TabsContent>
+            <TabsContent value="pipeline"><Pipeline jobs={pipeline} allJobs={jobs} onMove={onMove} onReorder={reorder} onOpen={onOpen} /></TabsContent>
             <TabsContent value="dismissed">
               <Dismissed jobs={dismissed} onOpen={onOpen} onRestore={(j) => change(j, { status: 'new' }, 'Restored to Inbox')} />
             </TabsContent>
@@ -231,11 +265,20 @@ export default function App() {
       </Sheet>
       <SettingsSheet open={drawer === 'settings'} onOpenChange={(o) => !o && setDrawer(null)} onChanged={reload} />
 
-      <JobSheet job={openJob} onClose={() => setOpenId(null)} onUpdate={(id, patch) => update(id, patch)} />
+      <JobSheet
+        job={openJob}
+        onClose={() => setOpenId(null)}
+        onUpdate={(id, patch) => update(id, patch)}
+        contacts={{ add: addContact, update: updateContact, remove: removeContact }}
+      />
     </div>
   )
 }
 
-function Count({ n }: { n: number }) {
-  return <span className="text-muted-foreground ml-1 text-xs tabular-nums">{n}</span>
+function Count({ n, unread }: { n: number; unread?: number }) {
+  return (
+    <span className="text-muted-foreground ml-1 text-xs tabular-nums">
+      {unread ? <><span className="text-primary font-semibold">{unread} new</span> / {n}</> : n}
+    </span>
+  )
 }

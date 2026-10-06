@@ -11,7 +11,7 @@ export type RawJob = {
 }
 
 // Queries for ATSs that search server-side. Greenhouse/Ashby/Lever return every job, so we filter locally.
-const QUERIES = ['product designer', 'ux designer', 'interaction designer', 'design engineer', 'design systems']
+const QUERIES = ['product designer', 'ux designer', 'interaction designer', 'design engineer', 'design systems', 'forward deployed engineer', 'ux engineer', 'design technologist', 'creative technologist']
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36'
 
 async function getJson(url: string, init: RequestInit = {}) {
@@ -114,28 +114,55 @@ async function amazon(): Promise<RawJob[]> {
 }
 
 // Eightfold (Netflix, Microsoft). Tenants use either /api/pcsx/search (Microsoft) or /api/apply/v2/jobs (Netflix),
-// set per company as `api` in companies.json. It rate-limits hard, so: two broad queries, sequential, paced.
+// set per company as `api` in companies.json. It rate-limits short bursts, so requests are sequential and paced,
+// keep the site's cookies like a browser session, and a 429/403 is retried twice after a pause.
+// pcsx returns 10 per page whatever `num` says, so it pages; the US location filter keeps that to a few pages.
+// If the limit still wins after the retries, the error carries the jobs fetched so far as `partial`.
 async function eightfold(c: Company): Promise<RawJob[]> {
   const base = new URL(c.url!).origin
   const out: RawJob[] = []
-  const queries = ['designer', 'design engineer']
-  for (const [i, q] of queries.entries()) {
-    if (i) await sleep(3000)
-    const query = `domain=${c.slug}&query=${encodeURIComponent(q)}&start=0&num=50`
-    const positions: any[] =
-      c.api === 'v2'
-        ? ((await getJson(`${base}/api/apply/v2/jobs?${query}`)).positions ?? [])
-        : ((await getJson(`${base}/api/pcsx/search?${query}`)).data?.positions ?? [])
-    for (const p of positions) {
-      const locs: string[] = p.standardizedLocations?.length ? p.standardizedLocations : (p.locations ?? [p.location])
-      const link = p.canonicalPositionUrl ?? p.positionUrl ?? `/careers/job/${p.id}`
-      out.push({
-        title: p.name ?? p.posting_name,
-        url: link.startsWith('http') ? link : `${base}${link}`,
-        location: locs.filter(Boolean).join('; '),
-        remote: /remote/i.test(`${p.workLocationOption ?? p.work_location_option ?? ''} ${locs.join(' ')}`),
-        posted_at: toIso(p.postedTs ?? p.t_create),
+  const cookies = new Map<string, string>()
+  const call = async (url: string) => {
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': UA, Accept: 'application/json', Referer: `${base}/careers`, Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; ') },
+        signal: AbortSignal.timeout(20000),
       })
+      for (const sc of res.headers.getSetCookie()) {
+        const [pair] = sc.split(';')
+        const eq = pair.indexOf('=')
+        if (eq > 0) cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim())
+      }
+      if (res.ok) return res.json() as Promise<any>
+      if (attempt >= 2 || (res.status !== 429 && res.status !== 403))
+        throw Object.assign(new Error(`${res.status} ${res.statusText} from ${new URL(url).host}`), { partial: dedupe(out) })
+      const wait = Number(res.headers.get('retry-after'))
+      await sleep(Math.min(wait > 0 ? wait * 1000 : 8000 * (attempt + 1), 60000))
+    }
+  }
+  let first = true
+  for (const q of ['designer', 'design engineer', 'forward deployed engineer', 'ux engineer', 'design technologist', 'creative technologist']) {
+    for (let start = 0; start < 60; ) {
+      if (!first) await sleep(2500)
+      first = false
+      const query = `domain=${c.slug}&query=${encodeURIComponent(q)}&start=${start}&num=10`
+      const d = c.api === 'v2' ? await call(`${base}/api/apply/v2/jobs?${query}`) : (await call(`${base}/api/pcsx/search?${query}&location=United%20States&sort_by=timestamp`)).data
+      const positions: any[] = d?.positions ?? []
+      for (const p of positions) {
+        // A bare country code ("US") means "United States, Multiple Locations"; the raw string says so.
+        const std: string[] = p.standardizedLocations ?? []
+        const locs: string[] = std.length && !std.every((l) => /^[A-Z]{2}$/.test(l)) ? std : (p.locations ?? [p.location])
+        const link = p.canonicalPositionUrl ?? p.positionUrl ?? `/careers/job/${p.id}`
+        out.push({
+          title: p.name ?? p.posting_name,
+          url: link.startsWith('http') ? link : `${base}${link}`,
+          location: locs.filter(Boolean).join('; '),
+          remote: /remote/i.test(`${p.workLocationOption ?? p.work_location_option ?? ''} ${locs.join(' ')}`),
+          posted_at: toIso(p.postedTs ?? p.t_create),
+        })
+      }
+      start += positions.length
+      if (!positions.length || start >= (d?.count ?? 0)) break
     }
   }
   return dedupe(out)

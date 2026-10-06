@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users } from 'lucide-react'
+import { Plus, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,11 +10,16 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { FitScore, JobTags, locationLabel } from '@/components/job-bits'
 import { Breakdown } from '@/components/scoring-settings'
-import { api, STATUS_LABEL, STATUSES, type Job, type JobPatch, type JobScore, linkedInPeopleSearch, timeAgo } from '@/lib/api'
+import { api, CONTACT_LABEL, CONTACT_STATUSES, STATUS_LABEL, STATUSES, type Contact, type ContactStatus, type Job, type JobPatch, type JobScore, linkedInPeopleSearch, timeAgo } from '@/lib/api'
 
-export function JobSheet({ job, onClose, onUpdate }: { job: Job | null; onClose: () => void; onUpdate: (id: string, patch: JobPatch) => void }) {
+type ContactActions = {
+  add: (jobId: string, c: { name: string; url?: string }) => Promise<void>
+  update: (c: Contact, patch: Partial<Pick<Contact, 'name' | 'url' | 'status'>>) => Promise<void>
+  remove: (c: Contact) => Promise<void>
+}
+
+export function JobSheet({ job, onClose, onUpdate, contacts }: { job: Job | null; onClose: () => void; onUpdate: (id: string, patch: JobPatch) => void; contacts: ContactActions }) {
   const [notes, setNotes] = useState('')
-  const [contact, setContact] = useState('')
   const [score, setScore] = useState<JobScore | null>(null)
   useEffect(() => {
     setScore(null)
@@ -22,7 +27,6 @@ export function JobSheet({ job, onClose, onUpdate }: { job: Job | null; onClose:
   }, [job?.id, job?.fit_score]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setNotes(job?.notes ?? '')
-    setContact(job?.referral_contact ?? '')
   }, [job?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -88,21 +92,7 @@ export function JobSheet({ job, onClose, onUpdate }: { job: Job | null; onClose:
                   onCheckedChange={(v) => onUpdate(job.id, { looking_for_referral: v, ...(v && job.status === 'new' ? { status: 'interested' } : {}) })}
                 />
               </div>
-              {job.looking_for_referral && (
-                <div className="flex flex-col gap-2">
-                  <Button variant="outline" size="sm" className="self-start" asChild>
-                    <a href={linkedInPeopleSearch(job.company)} target="_blank" rel="noreferrer">
-                      <Users /> Find people at {job.company}
-                    </a>
-                  </Button>
-                  <Input
-                    placeholder="Who you reached out to"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    onBlur={() => contact !== (job.referral_contact ?? '') && onUpdate(job.id, { referral_contact: contact || null })}
-                  />
-                </div>
-              )}
+              {job.looking_for_referral && <ReferralContacts job={job} actions={contacts} />}
 
               <Field label="Notes">
                 <Textarea
@@ -120,6 +110,68 @@ export function JobSheet({ job, onClose, onUpdate }: { job: Job | null; onClose:
     </Sheet>
   )
 }
+
+function ReferralContacts({ job, actions }: { job: Job; actions: ContactActions }) {
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const add = async () => {
+    if (!name.trim()) return
+    await actions.add(job.id, { name, url })
+    setName('')
+    setUrl('')
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      {!!job.contacts.length && (
+        <div className="divide-y rounded-md border">
+          {job.contacts.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 py-1.5 pr-1 pl-3">
+              <div className="min-w-0 flex-1">
+                {c.url ? (
+                  <a href={c.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-medium hover:underline underline-offset-4">{c.name}</a>
+                ) : (
+                  <p className="truncate text-sm font-medium">{c.name}</p>
+                )}
+                {c.messaged_at && <p className="text-muted-foreground text-xs">Messaged {shortDate(c.messaged_at)}</p>}
+              </div>
+              <Select value={c.status} onValueChange={(v) => actions.update(c, { status: v as ContactStatus })}>
+                <SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CONTACT_STATUSES.map((s) => <SelectItem key={s} value={s}>{CONTACT_LABEL[s]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="icon-sm" aria-label={`Remove ${c.name}`} onClick={() => actions.remove(c)}>
+                <X />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          add()
+        }}
+      >
+        <div className="flex gap-2">
+          <Input placeholder="Name and role" value={name} onChange={(e) => setName(e.target.value)} />
+          <Button type="submit" variant="outline" disabled={!name.trim()}>
+            <Plus /> Add
+          </Button>
+        </div>
+        <Input placeholder="LinkedIn profile URL (optional)" value={url} onChange={(e) => setUrl(e.target.value)} />
+      </form>
+      <Button variant="outline" size="sm" className="self-start" asChild>
+        <a href={linkedInPeopleSearch(job.company)} target="_blank" rel="noreferrer">
+          <Users /> Find people at {job.company}
+        </a>
+      </Button>
+    </div>
+  )
+}
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

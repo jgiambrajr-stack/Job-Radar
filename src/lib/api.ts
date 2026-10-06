@@ -1,13 +1,39 @@
-export const STATUSES = ['new', 'interested', 'applied', 'interviewing', 'declined', 'dismissed'] as const
+import type { LocationRules, LocationVerdict } from './location'
+
+export type { LocationRules }
+
+export const STATUSES = ['new', 'interested', 'applying', 'applied', 'interviewing', 'declined', 'dismissed'] as const
 export type Status = (typeof STATUSES)[number]
-export const PIPELINE: Status[] = ['interested', 'applied', 'interviewing', 'declined']
+export const PIPELINE: Status[] = ['interested', 'applying', 'applied', 'interviewing', 'declined']
 export const STATUS_LABEL: Record<Status, string> = {
   new: 'New',
   interested: 'Interested',
+  applying: 'Applying',
   applied: 'Applied',
   interviewing: 'Interviewing',
   declined: 'Declined',
   dismissed: 'Dismissed',
+}
+
+export const CONTACT_STATUSES = ['found', 'messaged', 'replied', 'referred', 'no_response'] as const
+export type ContactStatus = (typeof CONTACT_STATUSES)[number]
+export const CONTACT_LABEL: Record<ContactStatus, string> = {
+  found: 'Found',
+  messaged: 'Messaged',
+  replied: 'Replied',
+  referred: 'Referred',
+  no_response: 'No response',
+}
+
+/** A person found for a referral, with their own progress. */
+export type Contact = {
+  id: number
+  job_id: string
+  name: string
+  url: string | null
+  status: ContactStatus
+  messaged_at: string | null
+  created_at: string
 }
 
 export type Job = {
@@ -32,9 +58,13 @@ export type Job = {
   looking_for_referral: boolean
   referral_contact: string | null
   notes: string | null
+  board_order: number | null
+  /** When it was first opened. NULL = unread in the Inbox. */
+  read_at: string | null
+  contacts: Contact[]
 }
 
-export type JobPatch = Partial<Pick<Job, 'status' | 'notes' | 'looking_for_referral' | 'referral_contact'>>
+export type JobPatch = Partial<Pick<Job, 'status' | 'notes' | 'looking_for_referral'>> & { read?: boolean }
 
 export type Company = {
   name: string
@@ -49,7 +79,7 @@ export type Company = {
   jobs: number
 }
 
-export type Meta = { lastRun: string | null; errors: { company: string; error: string }[]; homeArea: { label: string; terms: string[] } }
+export type Meta = { lastRun: string | null; errors: { company: string; error: string }[]; locations: LocationRules }
 export type ScanResult = { company: string; fetched: number; matched: number; new: number; error?: string }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -62,6 +92,12 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   jobs: () => req<Job[]>('/jobs'),
   updateJob: (id: string, patch: JobPatch) => req('/jobs/' + id, { method: 'PATCH', body: JSON.stringify(patch) }),
+  markRead: (ids: string[]) => req('/jobs/read', { method: 'POST', body: JSON.stringify({ ids }) }),
+  reorder: (ids: string[]) => req('/jobs/order', { method: 'PUT', body: JSON.stringify({ ids }) }),
+  addContact: (jobId: string, c: { name: string; url?: string }) => req<Contact>(`/jobs/${jobId}/contacts`, { method: 'POST', body: JSON.stringify(c) }),
+  updateContact: (id: number, patch: Partial<Pick<Contact, 'name' | 'url' | 'status'>>) =>
+    req<Contact>(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  removeContact: (id: number) => req(`/contacts/${id}`, { method: 'DELETE' }),
   meta: () => req<Meta>('/meta'),
   companies: () => req<Company[]>('/companies'),
   addCompany: (name: string, url: string) =>
@@ -72,6 +108,10 @@ export const api = {
   insights: () => req<Insights>('/insights'),
   sweepStatus: () => req<SweepState>('/linkedin-sweep'),
   startSweep: () => req<SweepState>('/linkedin-sweep', { method: 'POST' }),
+  locations: () => req<LocationRules>('/locations'),
+  saveLocations: (l: LocationRules) => req('/locations', { method: 'PUT', body: JSON.stringify(l) }),
+  previewLocation: (location: string, config: LocationRules) =>
+    req<LocationVerdict | null>('/locations/preview', { method: 'POST', body: JSON.stringify({ location, config }) }),
   scoring: () => req<Scoring>('/scoring'),
   saveScoring: (s: Scoring) => req('/scoring', { method: 'PUT', body: JSON.stringify(s) }),
   previewScore: (title: string, config: Scoring) => req<ScoreParts>('/scoring/preview', { method: 'POST', body: JSON.stringify({ title, config }) }),

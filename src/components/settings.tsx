@@ -4,6 +4,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Companies } from '@/components/companies'
+import { LocationSettings } from '@/components/location-settings'
 import { ScoringSettings } from '@/components/scoring-settings'
 import { cn } from '@/lib/utils'
 
@@ -13,16 +14,20 @@ export function SettingsSheet({ open, onOpenChange, onChanged }: { open: boolean
       <SheetContent className="gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:w-3/4 data-[side=right]:sm:max-w-none">
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>Which companies get checked, how roles are scored, and how the dashboard looks.</SheetDescription>
+          <SheetDescription>Which companies and places get checked, how roles are scored, and how the dashboard looks.</SheetDescription>
         </SheetHeader>
         <Tabs defaultValue="companies" className="gap-4 px-4 pb-6">
           <TabsList>
             <TabsTrigger value="companies">Companies</TabsTrigger>
+            <TabsTrigger value="locations">Locations</TabsTrigger>
             <TabsTrigger value="scoring">Scoring</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
           <TabsContent value="companies" className="overflow-x-auto">
             <Companies onChanged={onChanged} />
+          </TabsContent>
+          <TabsContent value="locations">
+            <LocationSettings onSaved={onChanged} />
           </TabsContent>
           <TabsContent value="scoring">
             <ScoringSettings onRescored={onChanged} />

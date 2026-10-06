@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import type { LocationRules } from '../src/lib/location.ts'
 import { ROOT } from './paths.ts'
 
 export type Adapter = 'greenhouse' | 'ashby' | 'lever' | 'workday' | 'amazon' | 'eightfold' | 'jibe' | 'claude-browse'
@@ -9,11 +10,7 @@ export type Criteria = {
   titleInclude: string[]
   titleExclude: string[]
   tags: Record<string, string>
-  locationInclude: string[]
-  remoteMustBeUS: boolean
-  nonUSMarkers: string[]
-  // Where you'd work on-site: jobs whose location mentions any term count as local (Remote or {label}).
-  homeArea: { label: string; terms: string[] }
+  locations: LocationRules
 }
 
 const file = (name: string) => path.join(ROOT, 'config', name)
@@ -22,6 +19,20 @@ const readJson = <T>(name: string): T => JSON.parse(readFileSync(file(name), 'ut
 export const loadCompanies = () => readJson<Company[]>('companies.json')
 export const saveCompanies = (c: Company[]) => writeFileSync(file('companies.json'), JSON.stringify(c, null, 2) + '\n')
 export const loadCriteria = () => readJson<Criteria>('criteria.json')
+export const loadLocations = () => loadCriteria().locations
+export function saveLocations(locations: LocationRules) {
+  writeFileSync(file('criteria.json'), JSON.stringify({ ...loadCriteria(), locations }, null, 2) + '\n')
+}
+
+export function validateLocations(l: any): string | null {
+  const strs = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === 'string')
+  if (!l || !Array.isArray(l.areas)) return 'Areas are missing'
+  if (!l.areas.every((a: any) => typeof a.name === 'string' && a.name.trim() && strs(a.match) && a.match.length && (a.exclude === undefined || strs(a.exclude))))
+    return 'Each area needs a name and at least one place to match'
+  if (typeof l.includeRemote !== 'boolean' || typeof l.remoteUSOnly !== 'boolean' || !strs(l.nonUSMarkers)) return 'Remote settings are invalid'
+  if (!l.areas.length && !l.includeRemote) return 'Add at least one area or turn on remote roles, or nothing will match'
+  return null
+}
 
 export type Scoring = {
   profile: string
